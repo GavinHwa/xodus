@@ -41,7 +41,7 @@ public class PersistentBitTreeLongSet implements PersistentLongSet {
 
     @Override
     public PersistentLongSet.ImmutableSet beginRead() {
-        return new ImmutableSet(root);
+        return new ImmutableSet(root.map.beginRead(), root.size);
     }
 
     @Override
@@ -60,32 +60,38 @@ public class PersistentBitTreeLongSet implements PersistentLongSet {
 
     protected static class ImmutableSet implements PersistentLongSet.ImmutableSet {
         @NotNull
-        protected final Root root;
+        protected final AbstractPersistent23Tree<Entry> map;
+        protected final int size;
 
-        ImmutableSet(@NotNull final Root root) {
-            this.root = root;
+        ImmutableSet(@NotNull AbstractPersistent23Tree<Entry> map, int size) {
+            this.map = map;
+            this.size = size;
         }
 
         @Override
         public boolean contains(long key) {
             final long index = getEntryIndex(key);
-            final Entry entry = root.map.getRoot().get(new Entry(index, null));
+            final AbstractPersistent23Tree.RootNode<Entry> root = map.getRoot();
+            if (root == null) {
+                return false;
+            }
+            final Entry entry = root.get(new Entry(index, null));
             return entry != null && entry.bits.get((int) (key & MASK));
         }
 
         @Override
         public LongIterator longIterator() {
-            return new ItemIterator(root.map);
+            return new ItemIterator(map);
         }
 
         @Override
         public boolean isEmpty() {
-            return root.size == 0;
+            return size == 0;
         }
 
         @Override
         public int size() {
-            return root.size;
+            return size;
         }
     }
 
@@ -101,19 +107,19 @@ public class PersistentBitTreeLongSet implements PersistentLongSet {
             this.baseSet = baseSet;
         }
 
+        AbstractPersistent23Tree.RootNode<Entry> getRoot() {
+            return mutableSet.getRoot();
+        }
+
         @Override
         public boolean contains(long key) {
             final long index = getEntryIndex(key);
-            final AbstractPersistent23Tree.RootNode<Entry> root = mutableSet.getRoot();
+            final AbstractPersistent23Tree.RootNode<Entry> root = getRoot();
             if (root == null) {
                 return false;
             }
             final Entry entry = root.get(new Entry(index, null));
-            if (entry == null) {
-                return false;
-            }
-            int bitIndex = (int) (key & MASK);
-            return entry.bits.get(bitIndex);
+            return entry != null && entry.bits.get((int) (key & MASK));
         }
 
         @Override
@@ -135,11 +141,11 @@ public class PersistentBitTreeLongSet implements PersistentLongSet {
         public void add(long key) {
             final long index = getEntryIndex(key);
             Entry entry;
-            final AbstractPersistent23Tree.RootNode<Entry> root = mutableSet.getRoot();
+            final AbstractPersistent23Tree.RootNode<Entry> root = getRoot();
             if (root == null) {
                 entry = null;
             } else {
-                entry = mutableSet.getRoot().get(new Entry(index, null));
+                entry = getRoot().get(new Entry(index, null));
             }
             int bitIndex = (int) (key & MASK);
             if (entry == null) {
@@ -160,11 +166,11 @@ public class PersistentBitTreeLongSet implements PersistentLongSet {
         @Override
         public boolean remove(long key) {
             final long index = getEntryIndex(key);
-            final AbstractPersistent23Tree.RootNode<Entry> root = mutableSet.getRoot();
+            final AbstractPersistent23Tree.RootNode<Entry> root = getRoot();
             if (root == null) {
                 return false;
             }
-            Entry entry = mutableSet.getRoot().get(new Entry(index, null));
+            Entry entry = getRoot().get(new Entry(index, null));
             if (entry == null) {
                 return false;
             }

@@ -15,8 +15,9 @@
  */
 package jetbrains.exodus.benchmark.dataStructures.persistent;
 
-import jetbrains.exodus.core.dataStructures.persistent.PersistentLong23TreeMap;
-import jetbrains.exodus.core.dataStructures.persistent.PersistentLongMap;
+import jetbrains.exodus.core.dataStructures.persistent.PersistentBitTreeLongSet;
+import jetbrains.exodus.core.dataStructures.persistent.PersistentLong23TreeSet;
+import jetbrains.exodus.core.dataStructures.persistent.PersistentLongSet;
 import org.openjdk.jmh.annotations.*;
 
 import java.util.TreeMap;
@@ -24,25 +25,30 @@ import java.util.concurrent.TimeUnit;
 
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-public class JMHPersistentLong23TreeBenchmark {
+public class JMHPersistentLongSetBenchmark {
+    static final long MAP_SIZE = 100000;
 
-    private static final int MAP_SIZE = 100000;
+    private final PersistentLongSet treeSet = new PersistentLong23TreeSet();
+    private final PersistentLongSet bitTreeSet = new PersistentBitTreeLongSet();
 
-    private final PersistentLongMap<Object> tree = new PersistentLong23TreeMap<>();
     private final TreeMap<Long, Object> juTree = new TreeMap<>();
     private final Object value = new Object();
+
     private long existingKey = 0;
     private long missingKey = MAP_SIZE;
 
     @Setup
     public void prepare() {
-        final PersistentLongMap.MutableMap<Object> mutableMap = tree.beginWrite();
-        for (int i = 0; i < MAP_SIZE; ++i) {
+        final PersistentLongSet.MutableSet mutableTreeSet = treeSet.beginWrite();
+        final PersistentLongSet.MutableSet mutableBitSet = bitTreeSet.beginWrite();
+        for (long i = 0; i < MAP_SIZE; ++i) {
             // the keys are even
-            mutableMap.put((long) (i * 2), value);
-            juTree.put((long) (i * 2), value);
+            mutableTreeSet.add(i * 2);
+            mutableBitSet.add(i * 2);
+            juTree.put(i * 2, value);
         }
-        mutableMap.endWrite();
+        mutableTreeSet.endWrite();
+        mutableBitSet.endWrite();
     }
 
     @Setup(Level.Invocation)
@@ -56,31 +62,47 @@ public class JMHPersistentLong23TreeBenchmark {
     @Warmup(iterations = 4, time = 1)
     @Measurement(iterations = 6, time = 1)
     @Fork(5)
-    public Object getExisting() {
-        return tree.beginRead().get(existingKey);
+    public boolean get23TreeExisting() {
+        return treeSet.beginRead().contains(existingKey);
     }
 
     @Benchmark
     @Warmup(iterations = 4, time = 1)
     @Measurement(iterations = 6, time = 1)
     @Fork(5)
-    public Object getMissing() {
-        return tree.beginRead().get(missingKey);
+    public boolean get23TreeMissing() {
+        return treeSet.beginRead().contains(missingKey);
     }
 
     @Benchmark
     @Warmup(iterations = 4, time = 1)
     @Measurement(iterations = 6, time = 1)
     @Fork(5)
-    public Object treeMapGetExisting() {
-        return juTree.get(existingKey);
+    public boolean getBitTreeExisting() {
+        return bitTreeSet.beginRead().contains(existingKey);
     }
 
     @Benchmark
     @Warmup(iterations = 4, time = 1)
     @Measurement(iterations = 6, time = 1)
     @Fork(5)
-    public Object treeMapGetMissing() {
-        return juTree.get(missingKey);
+    public boolean getBitTreeMissing() {
+        return bitTreeSet.beginRead().contains(missingKey);
+    }
+
+    @Benchmark
+    @Warmup(iterations = 4, time = 1)
+    @Measurement(iterations = 6, time = 1)
+    @Fork(5)
+    public boolean treeMapGetExisting() {
+        return juTree.containsKey(existingKey);
+    }
+
+    @Benchmark
+    @Warmup(iterations = 4, time = 1)
+    @Measurement(iterations = 6, time = 1)
+    @Fork(5)
+    public boolean treeMapGetMissing() {
+        return juTree.containsKey(missingKey);
     }
 }
